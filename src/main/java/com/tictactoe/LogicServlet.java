@@ -16,15 +16,33 @@ public class LogicServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         HttpSession currentSession = req.getSession();
         Field field = extractField(currentSession);
+        if (checkWin(currentSession, resp, field)) {
+            return;
+        }
         int index = getSelectedIndex(req);
         Sign currentSign = field.getField().get(index);
-        if (Sign.EMPTY!=currentSign) {
-            RequestDispatcher rd = req.getRequestDispatcher("/index.jsp");
+        if (currentSign != Sign.EMPTY) {
+            RequestDispatcher rd = getServletContext().getRequestDispatcher("/index.jsp");
             rd.forward(req, resp);
+            return;
         }
-
-
-        field.getField().put(index,Sign.CROSS);
+        field.getField().put(index, Sign.CROSS);
+        if (checkWin(currentSession, resp, field)) {
+            return;
+        }
+        int emptyFieldIndex = field.getEmptyFieldIndex();
+        if (emptyFieldIndex >= 0) {
+            field.getField().put(emptyFieldIndex, Sign.NOUGHT);
+            if (checkWin(currentSession, resp, field)) {
+                return;
+            }
+        } else {
+            currentSession.setAttribute("draw", true);
+            List<Sign> data = field.getFieldData();
+            currentSession.setAttribute("data", data);
+            resp.sendRedirect("/index.jsp");
+            return;
+        }
         List<Sign> data = field.getFieldData();
         currentSession.setAttribute("field", field);
         currentSession.setAttribute("data", data);
@@ -44,5 +62,17 @@ public class LogicServlet extends HttpServlet {
         String click = req.getParameter("click");
         boolean isNumeric = click.chars().allMatch(Character::isDigit);
         return isNumeric ? Integer.parseInt(click) : 0;
+    }
+
+    private boolean checkWin(HttpSession currentSession, HttpServletResponse resp, Field field) throws IOException {
+        Sign winner = field.checkWin();
+        if (winner == Sign.CROSS || winner == Sign.NOUGHT) {
+            currentSession.setAttribute("winner", winner);
+            List<Sign> data = field.getFieldData();
+            currentSession.setAttribute("data", data);
+            resp.sendRedirect("/index.jsp");
+            return true;
+        }
+        return false;
     }
 }
